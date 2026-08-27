@@ -18,9 +18,8 @@ proceedings for settlement dates, which are the binding constraint in practice.
 
 ## Standard of evidence
 
-Built to **institutional investor standards: rigorous and auditable.** That is a claim
-about specific mechanisms, not a tone — the full list is in
-`references/auditability.md`. In short: every finding carries a source, a retrieval
+Built to **institutional investor standards: rigorous and auditable.** 
+In short: every finding carries a source, a retrieval
 date and the vintage of the underlying data; confidence is gated by vintage rather
 than conviction; scripts fail loudly on empty result sets so silence is never read as
 a negative finding; known limitations travel in-line with the number; and evidence
