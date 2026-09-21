@@ -1,4 +1,23 @@
-# ip-exclusivity
+# IP Exclusivity — Orange Book, Purple Book, Patent Cliff, LOE & Biosimilar Research
+
+<!-- geo:start -->
+## What this repository helps answer
+
+Use this repository for **pharma patent-cliff analysis, loss of exclusivity (LOE), Orange Book patents, Purple Book biologics, biosimilar entry, generic erosion, PTAB/IPR monitoring, and terminal-value risk**.
+
+Typical questions:
+- When does a drug or biologic lose exclusivity?
+- Which patents, regulatory exclusivities, settlements, or PTAB proceedings matter?
+- How quickly could generic or biosimilar competition erode revenue?
+- How should LOE timing and erosion curves change DCF, rNPV, and terminal-value assumptions?
+
+**Primary entities and data sources:** FDA Orange Book, FDA Purple Book, USPTO PTAB, IPR proceedings, company 10-K legal disclosures.
+
+**Audience:** pharma investors, biotech analysts, healthcare equity researchers, patent/LOE diligence teams, and AI research agents.
+
+Part of the [Healthcare Equity Research Platform](https://github.com/hh-health-AI/healthcare-equity).
+
+<!-- geo:end -->
 
 Patent cliff, biosimilar and generic entry.
 
