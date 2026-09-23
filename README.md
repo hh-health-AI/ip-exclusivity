@@ -81,3 +81,27 @@ Review them before use.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## Purple Book family lookup
+
+Brand/BLA searches resolve the reference product before looking across the full
+export for linked biosimilars. BLA matching is exact. Repeated export headers select
+the final full-database section; licensed counts use distinct BLAs, not presentations.
+
+Explicit reference BLA linkage takes precedence over exact reference proper name.
+Missing classification/linkage makes `biosimilar_count_licensed` null;
+`matched_biosimilar_bla_count` reports only positively linked BLAs. This avoids
+certifying a zero from an incomplete linkage. Unknown export schemas fail explicitly.
+Use the archive's publication date when citing results; the script's run date does
+not establish source vintage. Licensed still does not mean launched.
+
+## Regression tests
+
+Run offline with Python 3.10 or newer (standard library only):
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+Tests use synthetic fixtures and mocked APIs; they do not certify live endpoint
+availability or current regulatory facts. GitHub Actions runs the same tests on PRs.
