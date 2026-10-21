@@ -34,49 +34,92 @@ def norm(row):
         "interchangeable_exclusivity_expiry": g("interchangeable exclusivity expiry date"),
         "marketing_status": g("marketing status"),
         "ref_product_proper_name": g("ref product proper name", "reference product proper name"),
+        "ref_product_bla": g("reference product bla number", "ref product bla number"),
     }
+
+
+def bla_id(value):
+    return value.strip().lstrip("0")
+
+
+def kind(row):
+    return row["bla_type"].lower().replace(" ", "").replace("(", "").replace(")", "")
+
+
+def read_rows(lines):
+    # Monthly exports contain an updates section followed by the full database.
+    # Restart at a repeated header so changed products are not counted twice.
+    header, rows = None, []
+    for cells in csv.reader(lines):
+        names = {c.strip().lower() for c in cells}
+        if names.intersection({"bla number", "bla_number"}) and names.intersection({"proper name", "proper_name"}):
+            header, rows = cells, []
+        elif header and len(cells) == len(header):
+            row = norm(dict(zip(header, cells)))
+            if row["bla_number"].isdigit():
+                rows.append(row)
+    if not header or not rows:
+        raise ValueError("No supported Purple Book header/product rows found")
+    return rows
+
+
+def select_family(rows, product=None, bla=None):
+    if not (product and product.strip()) and not (bla and bla.strip().isdigit()):
+        raise ValueError("Provide a nonempty product name or numeric BLA number")
+    hits = [r for r in rows if
+            (bla_id(r["bla_number"]) == bla_id(bla) if bla else
+             any((product or "").casefold() in r[k].casefold()
+                 for k in ("proprietary_name", "proper_name")))]
+    if not hits:
+        raise ValueError("No matching products; check the name or exact BLA number")
+    refs = [r for r in rows if kind(r) == "351a"]
+    originators = [r for r in refs if r in hits or any(
+        (h["ref_product_bla"] and bla_id(h["ref_product_bla"]) == bla_id(r["bla_number"])) or
+        (not h["ref_product_bla"] and h["ref_product_proper_name"] and
+         h["ref_product_proper_name"].casefold() == r["proper_name"].casefold())
+        for h in hits if kind(h) == "351k")]
+    ids = {bla_id(r["bla_number"]) for r in originators}
+    names = {r["proper_name"].casefold() for r in originators if r["proper_name"]}
+    ambiguous = {name for name in names if len({bla_id(r["bla_number"]) for r in refs
+                 if r["proper_name"].casefold() == name}) > 1}
+    biosims = [r for r in rows if kind(r) == "351k" and (
+        (r["ref_product_bla"] and bla_id(r["ref_product_bla"]) in ids) or
+        (not r["ref_product_bla"] and r["ref_product_proper_name"].casefold() in names - ambiguous))]
+    # Without explicit reference linkage, do not silently certify a zero count.
+    complete = bool(originators) and not ambiguous and all(kind(r) in ("351a", "351k") for r in rows) and all(
+        r["ref_product_bla"] or r["ref_product_proper_name"] for r in rows if kind(r) == "351k")
+    count = len({bla_id(r["bla_number"]) for r in biosims})
+    return {"reference_products": originators, "biosimilars_licensed": biosims,
+            "matched_biosimilar_bla_count": count,
+            "biosimilar_count_licensed": count if complete else None,
+            "linkage_complete": complete,
+            "linkage_note": "Explicit reference BLA preferred, otherwise exact reference proper name. "
+                            "Counts are distinct BLAs, not strength/presentation rows. "
+                            "Missing classification or linkage makes the total unknown."}
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--csv", required=True)
-    ap.add_argument("--product", help="proprietary or proper name substring")
-    ap.add_argument("--bla", help="BLA number")
+    selector = ap.add_mutually_exclusive_group(required=True)
+    selector.add_argument("--product", help="proprietary or proper name substring")
+    selector.add_argument("--bla", help="exact BLA number")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args()
 
     with open(a.csv, newline="", encoding="utf-8-sig", errors="replace") as f:
         # Purple Book exports carry preamble lines before the header row.
         lines = f.readlines()
-    start = 0
-    for i, ln in enumerate(lines[:25]):
-        if "BLA" in ln.upper() and "NAME" in ln.upper():
-            start = i
-            break
-    rows = [norm(r) for r in csv.DictReader(lines[start:])]
-
-    def match(r):
-        if a.bla:
-            return a.bla.lstrip("0") in (r["bla_number"] or "").lstrip("0")
-        q = (a.product or "").upper()
-        return q and (q in r["proprietary_name"].upper() or q in r["proper_name"].upper())
-
-    hits = [r for r in rows if match(r)]
-    if not hits:
-        sys.stderr.write("No matching rows. Try the proper (nonproprietary) name -- "
-                         "biosimilars carry a four-letter suffix, e.g. adalimumab-atto.\n")
-        sys.exit(2)
-
-    originators = [r for r in hits if (r["bla_type"] or "").strip() in ("351(a)", "351a", "")]
-    biosims = [r for r in hits if (r["bla_type"] or "").strip() in ("351(k)", "351k")]
+    try:
+        family = select_family(read_rows(lines), a.product, a.bla)
+    except ValueError as exc:
+        ap.exit(2, str(exc) + "\n")
 
     out = {
         "retrieved": datetime.date.today().isoformat(),
         "query": {"product": a.product, "bla": a.bla},
-        "reference_products": originators,
-        "biosimilars_licensed": biosims,
-        "biosimilar_count_licensed": len(biosims),
+        **family,
         "reading": [
             "Licensed is not launched. Check for launch announcements, settlement-driven "
             "launch dates and manufacturing capacity before assuming any erosion.",
